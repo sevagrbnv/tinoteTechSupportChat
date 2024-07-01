@@ -4,12 +4,7 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.websocket.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import requests.Acc
-import requests.Hi
-import requests.Login
 
 class TinodeClient(
     private val host: String,
@@ -21,11 +16,9 @@ class TinodeClient(
         private const val PATH = "/v0/channels"
         private const val API_HEADER = "X-Tinode-APIKey"
         private const val PING_INTERVAL = 20_000L
-
-        private const val TEMP_SECRET = "bG9naW5sb2dpbjpwYXNzd29yZDEyMw=="
     }
 
-    private var userState = USER_STATE.HI
+    private val queue: ArrayDeque<TinodeAction> = ArrayDeque()
 
     private val client by lazy {
         HttpClient(CIO) {
@@ -41,10 +34,10 @@ class TinodeClient(
     private val jsonFormat = Json {
         encodeDefaults = true
         ignoreUnknownKeys = true
-        classDiscriminator = "Ctrl"
     }
 
-    suspend fun auth(name: String, login: String, pass: String) {
+
+    suspend fun start() {
         client.webSocket(
             method = HttpMethod.Get,
             host = host,
@@ -52,48 +45,28 @@ class TinodeClient(
             path = PATH,
             request = { header(API_HEADER, apiKey) }
         ) {
-            while (userState != USER_STATE.READY) {
-                when (userState) {
-                    USER_STATE.HI -> {
-                        send(jsonFormat.encodeToString(Hi()))
-
-                        val response = incoming.receive() as Frame.Text
-                        println(response.readText())
-                        val responseCtrl = jsonFormat.decodeFromString<HiResponseCtrl>(response.readText())
-                        if (responseCtrl.ctrl.code == HttpStatusCode.Created.value) userState = USER_STATE.LOGIN
-                        else throw RuntimeException("Error")
-                    }
-
-                    USER_STATE.LOGIN -> {
-                        send(jsonFormat.encodeToString(Login(base64 = TEMP_SECRET)))
-
-                        val response = incoming.receive() as Frame.Text
-                        println(response.readText())
-                        val responseCtrl = jsonFormat.decodeFromString<LoginResponseCtrl>(response.readText())
-                        userState = when (responseCtrl.ctrl.code) {
-                            HttpStatusCode.OK.value -> USER_STATE.READY
-                            HttpStatusCode.BadRequest.value -> USER_STATE.REG // 400 неверный пароль
-                            HttpStatusCode.Unauthorized.value -> USER_STATE.REG // 401 нет юзера
-                            else -> throw RuntimeException("Error")
+            while (true) {
+                if (queue.isNotEmpty()) {
+                    when (val action = queue.firstOrNull()) {
+                        is TinodeAction.Auth -> {
+                            AuthManager(this, jsonFormat).apply {
+                                manageAuth(action)
+                            }
                         }
-                    }
-
-                    USER_STATE.REG -> {
-                        val public = Acc.Public(name)
-                        val desc = Acc.Desc(public)
-                        val acc = Acc(Acc.AccBody(desc = desc, cred = listOf(Acc.Cred()), secret = TEMP_SECRET))
-                        println(acc)
-                        send(jsonFormat.encodeToString(acc))
-
-                        val response = incoming.receive() as Frame.Text
-                        println(response.readText())
-                        val responseCtrl = jsonFormat.decodeFromString<LoginResponseCtrl>(response.readText())
-                        userState = when (responseCtrl.ctrl.code) {
-                            HttpStatusCode.OK.value -> USER_STATE.LOGIN
-                            else -> {throw RuntimeException()}
+                        TinodeAction.CreateChats -> {
+                            ChatManager(this, jsonFormat).apply {
+                                setupChats()
+                            }
                         }
+                        TinodeAction.GetMessages -> {
+
+                        }
+                        TinodeAction.SendMessage -> {
+
+                        }
+                        else -> {}
                     }
-                    else -> {}
+                    queue.removeFirst()
                 }
             }
         }
@@ -103,10 +76,7 @@ class TinodeClient(
         client.close()
     }
 
-    private enum class USER_STATE {
-        HI,
-        REG,
-        LOGIN,
-        READY
+    fun dispatch(action: TinodeAction) {
+        queue.addLast(action)
     }
 }
