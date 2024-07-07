@@ -1,4 +1,4 @@
-package requests
+package requests.auth
 
 import kotlinx.serialization.Serializable
 

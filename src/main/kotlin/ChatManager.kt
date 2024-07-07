@@ -2,23 +2,32 @@ import domain.Topic
 import io.ktor.client.plugins.websocket.*
 import io.ktor.http.*
 import io.ktor.websocket.*
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import requests.CreateChat
-import requests.GetAvailableChats
+import requests.chats.AddUser
+import requests.chats.CreateChat
+import requests.chats.GetAvailableChats
+import responces.ChatCreateResult
 import responces.ChatListSubResponseCtrl
+import responces.ChatMeta
+import responces.EmptyChatList
 import utils.Base64
-import java.net.http.HttpResponse
 
 class ChatManager(
     private val session: DefaultClientWebSocketSession,
     private val json: Json,
 ) {
 
-    private val chatList = listOf<ChatConfig>(ChatConfig("ТехПоддержка", listOf()))
+    companion object {
+        const val TECH_SUPPORT_ACCOUNT = "usrIBd2l9hwhh0"
+    }
+
+    private val chatList = listOf(
+        ChatConfig("ТехПоддержка", listOf(TECH_SUPPORT_ACCOUNT))
+    )
 
     suspend fun DefaultClientWebSocketSession.setupChats() {
+
         send(json.encodeToString(GetAvailableChats()))
 
         val resultResponse = incoming.receive() as Frame.Text
@@ -29,15 +38,24 @@ class ChatManager(
             val subscribeResponse = incoming.receive() as Frame.Text
             println(subscribeResponse.readText())
 
-            val metaChatList = json.decodeFromString<ChatMeta>(subscribeResponse.readText())
-            val topicList = metaChatList.meta.sub.map { it.toTopic() }
+            val metaChatList = try {
+                json.decodeFromString<ChatMeta>(subscribeResponse.readText())
+            } catch (e: Exception) {
+                json.decodeFromString<EmptyChatList>(subscribeResponse.readText())
+            }
 
-            val metaChatNameList = metaChatList.meta.sub.map { it.public.fn }
+            val topicList = if (metaChatList is ChatMeta)
+                metaChatList.meta.sub.map { it.toTopic() }.toMutableList()
+            else mutableListOf()
+
+            val metaChatNameList = if (metaChatList is ChatMeta)
+                metaChatList.meta.sub.map { it.public.fn }
+            else mutableListOf()
             println(metaChatNameList)
 
             chatList.forEach {
                 if (!metaChatNameList.contains(it.name)) {
-                    createChat(session, it.name)
+                    topicList.add(Topic(it.name, createChat(session, it)))
                 }
             }
         }
@@ -45,16 +63,31 @@ class ChatManager(
 
     private suspend fun createChat(
         session: DefaultClientWebSocketSession,
-        name: String,
-    ) {
-        val public = CreateChat.Sub.Set.Desc.Public(name, "")
+        config: ChatConfig,
+    ) : String {
+        val public = CreateChat.Sub.Set.Desc.Public(config.name, "")
         val desc = CreateChat.Sub.Set.Desc(public)
         val set = CreateChat.Sub.Set(desc)
-        val sub = CreateChat.Sub(set = set, topic = "new${Base64.encodeToBase64(name)}")
+        val sub = CreateChat.Sub(set = set, topic = "new${Base64.encodeToBase64(config.name)}")
         session.send(json.encodeToString(CreateChat(sub = sub)))
 
         val resultResponse = session.incoming.receive() as Frame.Text
         println(resultResponse.readText())
+        val result = json.decodeFromString<ChatCreateResult>(resultResponse.readText())
+
+        if (result.ctrl.code == HttpStatusCode.OK.value) {
+            config.users.forEach{
+                val sub = AddUser.Set.Sub(it)
+                val set = AddUser.Set(sub, topic = result.ctrl.topic)
+                val addUser = AddUser(set)
+                session.send(json.encodeToString(addUser))
+            }
+
+            val resultResponse = session.incoming.receive() as Frame.Text
+            println(resultResponse.readText())
+        } else RuntimeException("Error of creating channel")
+
+        return result.ctrl.topic
     }
 
     data class ChatConfig(
@@ -63,7 +96,7 @@ class ChatManager(
     )
 }
 
-fun Sub.toTopic() = Topic (
+fun ChatMeta.Meta.Sub.toTopic() = Topic(
     id = topic,
     name = public.fn
 )

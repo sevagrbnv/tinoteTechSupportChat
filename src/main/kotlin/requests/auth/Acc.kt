@@ -1,4 +1,4 @@
-package requests
+package requests.auth
 
 @kotlinx.serialization.Serializable
 data class Acc(

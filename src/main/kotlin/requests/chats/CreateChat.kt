@@ -1,4 +1,4 @@
-package requests
+package requests.chats
 
 
 import kotlinx.serialization.SerialName

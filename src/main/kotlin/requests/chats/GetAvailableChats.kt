@@ -1,4 +1,4 @@
-package requests
+package requests.chats
 
 @kotlinx.serialization.Serializable
 data class GetAvailableChats(

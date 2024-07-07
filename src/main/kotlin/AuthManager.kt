@@ -3,9 +3,9 @@ import io.ktor.http.*
 import io.ktor.websocket.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import requests.Acc
-import requests.Hi
-import requests.Login
+import requests.auth.Acc
+import requests.auth.Hi
+import requests.auth.Login
 import utils.Base64
 
 class AuthManager(
