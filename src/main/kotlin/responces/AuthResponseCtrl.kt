@@ -18,7 +18,14 @@ data class LoginResponseCtrl(
     @kotlinx.serialization.Serializable
     data class LoginResponse(
         @SerializedName("code") override val code: Int,
-    ) : Ctrl
+        @SerializedName("params") val params: Params,
+    ) : Ctrl {
+        @kotlinx.serialization.Serializable
+        data class Params(
+            @SerializedName("token") val token: String,
+            @SerializedName("expires") val expires: String,
+        )
+    }
 }
 
 @kotlinx.serialization.Serializable

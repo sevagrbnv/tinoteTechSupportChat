@@ -13,6 +13,8 @@ class AuthManager(
     private val json: Json,
 ) {
 
+    private var token: Pair<String, String>? = null
+
     private var authState = AUTH_STATE.HI
 
     private enum class AUTH_STATE {
@@ -22,7 +24,7 @@ class AuthManager(
         READY,
     }
 
-    suspend fun manageAuth(action: TinodeAction.Auth) {
+    suspend fun manageAuth(action: TinodeAction.Auth): Pair<String, String> {
         while (authState != AUTH_STATE.READY) {
             try {
                 when (authState) {
@@ -35,6 +37,7 @@ class AuthManager(
                 throw RuntimeException(e.message)
             }
         }
+        return token ?: throw IllegalStateException("No token")
     }
 
 
@@ -42,7 +45,7 @@ class AuthManager(
         send(json.encodeToString(Hi()))
 
         val response = incoming.receive() as Frame.Text
-        println(response.readText())
+//        println(response.readText())
         val responseCtrl = json.decodeFromString<HiResponseCtrl>(response.readText())
         if (responseCtrl.ctrl.code == HttpStatusCode.Created.value) {
             authState = AUTH_STATE.LOGIN
@@ -56,10 +59,13 @@ class AuthManager(
         send(json.encodeToString(Login(base64 = Base64.encodeToBase64("$login:$password"))))
 
         val response = incoming.receive() as Frame.Text
-        println(response.readText())
+//        println(response.readText())
         val responseCtrl = json.decodeFromString<LoginResponseCtrl>(response.readText())
         authState = when (responseCtrl.ctrl.code) {
-            HttpStatusCode.OK.value -> AUTH_STATE.READY
+            HttpStatusCode.OK.value -> {
+                token = responseCtrl.ctrl.params.token to responseCtrl.ctrl.params.expires
+                AUTH_STATE.READY
+            }
             HttpStatusCode.BadRequest.value -> AUTH_STATE.LOGIN // 400 неверный пароль
             HttpStatusCode.Unauthorized.value -> AUTH_STATE.REG // 401 нет аккаунта
             else -> throw RuntimeException("Error in login()")
@@ -81,11 +87,11 @@ class AuthManager(
                     secret = Base64.encodeToBase64("$login:$password")
                 )
             )
-        println(acc)
+//        println(acc)
         send(json.encodeToString(acc))
 
         val response = incoming.receive() as Frame.Text
-        println(response.readText())
+//        println(response.readText())
         val responseCtrl = json.decodeFromString<LoginResponseCtrl>(response.readText())
         when (responseCtrl.ctrl.code) {
             HttpStatusCode.OK.value -> authState = AUTH_STATE.LOGIN

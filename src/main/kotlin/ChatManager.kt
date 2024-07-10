@@ -13,7 +13,8 @@ import responces.ChatMeta
 import responces.EmptyChatList
 import utils.Base64
 
-class ChatManager(
+class ChatManager
+    (
     private val session: DefaultClientWebSocketSession,
     private val json: Json,
 ) {
@@ -31,12 +32,12 @@ class ChatManager(
         send(json.encodeToString(GetAvailableChats()))
 
         val resultResponse = incoming.receive() as Frame.Text
-        println(resultResponse.readText())
+//        println(resultResponse.readText())
 
         val responseCtrl = json.decodeFromString<ChatListSubResponseCtrl>(resultResponse.readText())
         if (responseCtrl.ctrl.code == HttpStatusCode.OK.value) {
             val subscribeResponse = incoming.receive() as Frame.Text
-            println(subscribeResponse.readText())
+//            println(subscribeResponse.readText())
 
             val metaChatList = try {
                 json.decodeFromString<ChatMeta>(subscribeResponse.readText())
@@ -51,11 +52,11 @@ class ChatManager(
             val metaChatNameList = if (metaChatList is ChatMeta)
                 metaChatList.meta.sub.map { it.public.fn }
             else mutableListOf()
-            println(metaChatNameList)
+//            println(metaChatNameList)
 
             chatList.forEach {
                 if (!metaChatNameList.contains(it.name)) {
-                    topicList.add(Topic(it.name, createChat(session, it)))
+                    topicList.add(Topic(it.name, createChat(session, it), mutableListOf(), messages = null))
                 }
             }
         }
@@ -72,7 +73,7 @@ class ChatManager(
         session.send(json.encodeToString(CreateChat(sub = sub)))
 
         val resultResponse = session.incoming.receive() as Frame.Text
-        println(resultResponse.readText())
+//        println(resultResponse.readText())
         val result = json.decodeFromString<ChatCreateResult>(resultResponse.readText())
 
         if (result.ctrl.code == HttpStatusCode.OK.value) {
@@ -84,7 +85,7 @@ class ChatManager(
             }
 
             val resultResponse = session.incoming.receive() as Frame.Text
-            println(resultResponse.readText())
+//            println(resultResponse.readText())
         } else RuntimeException("Error of creating channel")
 
         return result.ctrl.topic
@@ -95,8 +96,3 @@ class ChatManager(
         val users: List<String>,
     )
 }
-
-fun ChatMeta.Meta.Sub.toTopic() = Topic(
-    id = topic,
-    name = public.fn
-)

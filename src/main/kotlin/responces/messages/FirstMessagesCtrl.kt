@@ -1,17 +1,17 @@
-package responces
+package responces.messages
+
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-
-interface Ctrl { val code: Int }
+import responces.Ctrl
 
 @Serializable
-data class DefaultCtrl(
+data class FirstMessagesCtrl(
     @SerialName("ctrl")
-    val ctrl: DefaultCtrlImpl
+    val ctrl: FirstCtrl
 ) {
     @Serializable
-    data class DefaultCtrlImpl(
+    data class FirstCtrl(
         @SerialName("code")
         override val code: Int
     ) : Ctrl

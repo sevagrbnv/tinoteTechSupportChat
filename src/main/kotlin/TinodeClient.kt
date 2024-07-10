@@ -1,9 +1,13 @@
+import domain.Topic
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 class TinodeClient(
@@ -18,7 +22,15 @@ class TinodeClient(
         private const val PING_INTERVAL = 20_000L
     }
 
-    private val queue: ArrayDeque<TinodeAction> = ArrayDeque()
+    private val inputQueue: ArrayDeque<TinodeAction> = ArrayDeque()
+
+    private var shouldBeFinished = false
+
+    var token: Pair<String, String>? = null
+
+    val chats = mutableListOf<Topic>()
+
+    private val subScope = CoroutineScope(Dispatchers.Default)
 
     private val client by lazy {
         HttpClient(CIO) {
@@ -45,38 +57,51 @@ class TinodeClient(
             path = PATH,
             request = { header(API_HEADER, apiKey) }
         ) {
-            while (true) {
-                if (queue.isNotEmpty()) {
-                    when (val action = queue.firstOrNull()) {
+            while (!shouldBeFinished) {
+                if (inputQueue.isNotEmpty()) {
+                    val messageManager by lazy {
+                        MessageManager(this, jsonFormat, subScope)
+                    }
+
+                    when (val action = inputQueue.firstOrNull()) {
                         is TinodeAction.Auth -> {
-                            AuthManager(this, jsonFormat).apply {
-                                manageAuth(action)
-                            }
+                            val authManager = AuthManager(this, jsonFormat)
+                            token = authManager.manageAuth(action)
                         }
                         TinodeAction.CreateChats -> {
                             ChatManager(this, jsonFormat).apply {
                                 setupChats()
                             }
                         }
-                        TinodeAction.GetMessages -> {
+                        is TinodeAction.GetMessages -> {
+                            subScope.launch {
+                                messageManager.apply {
+                                    subscribeTopic(action.topicId)
+                                }
+                            }
 
+                        }
+                        is TinodeAction.GetPagingHistory -> {
+                            messageManager.apply {
+                                getPagingHistory(action.topicId, action.before, action.limit)
+                            }
                         }
                         TinodeAction.SendMessage -> {
 
                         }
+                        TinodeAction.CloseConnection -> {
+                            shouldBeFinished = true
+                            client.close()
+                        }
                         else -> {}
                     }
-                    queue.removeFirst()
+                    inputQueue.removeFirst()
                 }
             }
         }
     }
 
-    fun close() {
-        client.close()
-    }
-
     fun dispatch(action: TinodeAction) {
-        queue.addLast(action)
+        inputQueue.addLast(action)
     }
 }
