@@ -5,10 +5,12 @@ import io.ktor.websocket.*
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import requests.messages.GetPagingData
+import requests.messages.LeaveChatRequest
 import requests.messages.SendMessageRequest
 import requests.messages.SubToMessages
 import responces.DefaultCtrl
@@ -24,7 +26,9 @@ class MessageManager(
 
     var shouldBeFinished = atomic(false)
 
-    suspend fun DefaultClientWebSocketSession.subscribeTopic(topicId: String, messageFlow: MutableStateFlow<MutableList<Message>>) {
+    suspend fun DefaultClientWebSocketSession.subscribeTopic(
+        topicId: String,
+    ) = flow {
 
         val data = SubToMessages.Sub.Get.Data()
         val get = SubToMessages.Sub.Get(data)
@@ -39,16 +43,11 @@ class MessageManager(
         val responseCtrl = json.decodeFromString<DefaultCtrl>(resultResponse.readText())
 
         if (responseCtrl.ctrl.code == HttpStatusCode.OK.value) {
-            repeat(4) {
-                incoming.receive() as Frame.Text
-            }
-
-            var currSeq: Int? = null
-            val messageList = mutableListOf<Message>()
+//            repeat(4) {
+//                incoming.receive() as Frame.Text
+//            }
 
             while (!shouldBeFinished.value) {
-                //println(shouldBeFinished)
-
 
                 if (!incoming.isEmpty) {
                     val response = (incoming.receive() as Frame.Text).readText()
@@ -61,18 +60,7 @@ class MessageManager(
                         "pres" in jsonObject -> json.decodeFromString<MessagePres>(response)
                         "data" in jsonObject -> {
                             val message = json.decodeFromString<Data>(response).toMessage()
-                            println(message)
-
-                            when {
-                                currSeq == null || message.seq > currSeq -> {
-                                    currSeq = message.seq
-                                    messageList.add(message)
-                                }
-                                message.seq < currSeq -> {
-                                    messageList.add(0, message)
-                                }
-                            }
-                            messageFlow.emit(messageList)
+                            emit(message)
                         }
                         else -> throw RuntimeException("oaoaoaaoaoa")
                     }
@@ -86,11 +74,20 @@ class MessageManager(
         val data = GetPagingData.Get.Data(before, limit, since = 1)
         val get = GetPagingData.Get(data = data, topic = topicId)
         val getPagingMessages = GetPagingData(get)
+        //sendSerialized(getPagingMessages)
         send(json.encodeToString(getPagingMessages))
     }
 
     suspend fun DefaultClientWebSocketSession.sendMessage(topicId: String, content: String) {
         val pub = SendMessageRequest.Pub(topic = topicId, content = content)
+        //sendSerialized(SendMessageRequest(pub))
         send(json.encodeToString(SendMessageRequest(pub)))
+    }
+
+    suspend fun DefaultClientWebSocketSession.leaveChat(topicId: String) {
+        val leave = LeaveChatRequest.Leave(topicId)
+        //sendSerialized(LeaveChatRequest(leave))
+        send(json.encodeToString(LeaveChatRequest(leave)))
+
     }
 }

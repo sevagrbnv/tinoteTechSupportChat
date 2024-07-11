@@ -43,13 +43,14 @@ class AuthManager(
 
     private suspend fun DefaultClientWebSocketSession.hi() {
         send(json.encodeToString(Hi()))
+        //sendSerialized(Hi.HiBody("1", "2", "3", "4"))
 
         val response = incoming.receive() as Frame.Text
 //        println(response.readText())
         val responseCtrl = json.decodeFromString<HiResponseCtrl>(response.readText())
         if (responseCtrl.ctrl.code == HttpStatusCode.Created.value) {
             authState = AUTH_STATE.LOGIN
-        } else throw RuntimeException("Error in Hi()")
+        } else throw RuntimeException("Error in Hi() $responseCtrl")
     }
 
     private suspend fun DefaultClientWebSocketSession.login(

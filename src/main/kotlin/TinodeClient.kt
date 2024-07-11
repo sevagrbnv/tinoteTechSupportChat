@@ -2,14 +2,17 @@ import domain.Message
 import domain.Topic
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -31,7 +34,9 @@ class TinodeClient(
 
     lateinit var token: Pair<String, String>
 
-    val messagesFlow = MutableStateFlow<MutableList<Message>>(mutableListOf())
+    // хочу складывать сюда
+    private val _messagesFlow = MutableSharedFlow<Message>()
+    val messagesFlow: SharedFlow<Message> = _messagesFlow.asSharedFlow()
 
     val chats = mutableListOf<Topic>()
 
@@ -39,8 +44,18 @@ class TinodeClient(
 
     private val client by lazy {
         HttpClient(CIO) {
+
+            install(ContentNegotiation) {
+                json(
+                    Json {
+                        isLenient = true
+                        ignoreUnknownKeys = true
+                    }
+                )
+            }
             install(WebSockets) {
                 pingInterval = PING_INTERVAL
+                contentConverter = KotlinxWebsocketSerializationConverter(Json)
             }
             install(Logging) {
                 level = LogLevel.ALL
@@ -75,13 +90,19 @@ class TinodeClient(
                         }
                         TinodeAction.CreateChats -> {
                             ChatManager(this, jsonFormat).apply {
-                                chats.addAll(setupChats())
+                                val a = setupChats()
+                                println(a)
+                                chats.addAll(a)
                             }
                         }
                         is TinodeAction.GetMessages -> {
                             subScope.launch {
                                 messageManager.apply {
-                                    subscribeTopic(action.topicId, messagesFlow)
+                                    // хочу получать отсюда
+                                    subscribeTopic(action.topicId).collect { message ->
+                                        _messagesFlow.emit(message)
+                                    }
+
                                 }
                             }
 
@@ -96,9 +117,14 @@ class TinodeClient(
                                 sendMessage(action.topicId, action.content)
                             }
                         }
+                        is TinodeAction.LeaveChat -> {
+                            messageManager.apply {
+                                leaveChat(action.topicId)
+                            }
+                        }
                         TinodeAction.CloseConnection -> {
                             shouldBeFinished = true
-                            client.close()
+                            //client.close()
                         }
                         else -> {}
                     }

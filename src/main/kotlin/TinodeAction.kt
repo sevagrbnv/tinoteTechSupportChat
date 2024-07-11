@@ -24,5 +24,9 @@ sealed class TinodeAction {
         val content: String
     ) : TinodeAction()
 
+    data class LeaveChat(
+        val topicId: String
+    ) : TinodeAction()
+
     object CloseConnection: TinodeAction()
 }
