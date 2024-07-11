@@ -8,11 +8,12 @@ import responces.messages.Data
 fun ChatMeta.Meta.Sub.toTopic() = Topic(
     id = topic,
     name = public.fn,
-    messages = MutableStateFlow(mutableListOf()),
-    user = mutableListOf()
+    //messages = MutableStateFlow(mutableListOf()),
+    //user = mutableListOf()
 )
 
 fun Data.toMessage() = Message(
+    content = data.content,
     from = data.from,
     seq = data.seq,
     topic = data.topic,

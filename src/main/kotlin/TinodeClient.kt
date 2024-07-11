@@ -1,3 +1,4 @@
+import domain.Message
 import domain.Topic
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -7,6 +8,8 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -26,7 +29,9 @@ class TinodeClient(
 
     private var shouldBeFinished = false
 
-    var token: Pair<String, String>? = null
+    lateinit var token: Pair<String, String>
+
+    val messagesFlow = MutableStateFlow<MutableList<Message>>(mutableListOf())
 
     val chats = mutableListOf<Topic>()
 
@@ -70,13 +75,13 @@ class TinodeClient(
                         }
                         TinodeAction.CreateChats -> {
                             ChatManager(this, jsonFormat).apply {
-                                setupChats()
+                                chats.addAll(setupChats())
                             }
                         }
                         is TinodeAction.GetMessages -> {
                             subScope.launch {
                                 messageManager.apply {
-                                    subscribeTopic(action.topicId)
+                                    subscribeTopic(action.topicId, messagesFlow)
                                 }
                             }
 
@@ -86,8 +91,10 @@ class TinodeClient(
                                 getPagingHistory(action.topicId, action.before, action.limit)
                             }
                         }
-                        TinodeAction.SendMessage -> {
-
+                        is TinodeAction.SendMessage -> {
+                            messageManager.apply {
+                                sendMessage(action.topicId, action.content)
+                            }
                         }
                         TinodeAction.CloseConnection -> {
                             shouldBeFinished = true

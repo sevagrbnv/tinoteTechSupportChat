@@ -19,7 +19,10 @@ sealed class TinodeAction {
         val limit: Int = 24,
     ) : TinodeAction()
 
-    object SendMessage : TinodeAction()
+    data class SendMessage(
+        val topicId: String,
+        val content: String
+    ) : TinodeAction()
 
     object CloseConnection: TinodeAction()
 }

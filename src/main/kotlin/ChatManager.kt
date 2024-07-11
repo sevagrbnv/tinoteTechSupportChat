@@ -27,17 +27,15 @@ class ChatManager
         ChatConfig("ТехПоддержка", listOf(TECH_SUPPORT_ACCOUNT))
     )
 
-    suspend fun DefaultClientWebSocketSession.setupChats() {
+    suspend fun DefaultClientWebSocketSession.setupChats(): List<Topic> {
 
         send(json.encodeToString(GetAvailableChats()))
 
         val resultResponse = incoming.receive() as Frame.Text
-//        println(resultResponse.readText())
 
         val responseCtrl = json.decodeFromString<ChatListSubResponseCtrl>(resultResponse.readText())
         if (responseCtrl.ctrl.code == HttpStatusCode.OK.value) {
             val subscribeResponse = incoming.receive() as Frame.Text
-//            println(subscribeResponse.readText())
 
             val metaChatList = try {
                 json.decodeFromString<ChatMeta>(subscribeResponse.readText())
@@ -52,14 +50,16 @@ class ChatManager
             val metaChatNameList = if (metaChatList is ChatMeta)
                 metaChatList.meta.sub.map { it.public.fn }
             else mutableListOf()
-//            println(metaChatNameList)
 
             chatList.forEach {
                 if (!metaChatNameList.contains(it.name)) {
-                    topicList.add(Topic(it.name, createChat(session, it), mutableListOf(), messages = null))
+                    topicList.add(Topic(it.name, createChat(session, it)))
                 }
             }
-        }
+
+            return topicList
+        } else throw RuntimeException("Chat list not available")
+
     }
 
     private suspend fun createChat(
@@ -73,7 +73,6 @@ class ChatManager
         session.send(json.encodeToString(CreateChat(sub = sub)))
 
         val resultResponse = session.incoming.receive() as Frame.Text
-//        println(resultResponse.readText())
         val result = json.decodeFromString<ChatCreateResult>(resultResponse.readText())
 
         if (result.ctrl.code == HttpStatusCode.OK.value) {
@@ -85,7 +84,6 @@ class ChatManager
             }
 
             val resultResponse = session.incoming.receive() as Frame.Text
-//            println(resultResponse.readText())
         } else RuntimeException("Error of creating channel")
 
         return result.ctrl.topic

@@ -5,7 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class SubMessages(
+data class SubToMessages(
     @SerialName("sub")
     val sub: Sub
 ) {
@@ -13,8 +13,6 @@ data class SubMessages(
     data class Sub(
         @SerialName("get")
         val `get`: Get,
-//        @SerialName("id")
-//        val id: String,
         @SerialName("topic")
         val topic: String
     ) {
@@ -22,8 +20,6 @@ data class SubMessages(
         data class Get(
             @SerialName("data")
             val `data`: Data,
-//            @SerialName("desc")
-//            val desc: Desc,
             @SerialName("what")
             val what: String = "desc sub data del tags"
         ) {
@@ -32,12 +28,6 @@ data class SubMessages(
                 @SerialName("limit")
                 val limit: Int = 24
             )
-
-//            @Serializable
-//            data class Desc(
-//                @SerialName("ims")
-//                val ims: String
-//            )
         }
     }
 }

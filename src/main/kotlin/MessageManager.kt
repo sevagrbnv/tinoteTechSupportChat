@@ -1,24 +1,20 @@
+import domain.Message
 import io.ktor.client.plugins.websocket.*
 import io.ktor.http.*
 import io.ktor.websocket.*
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.actor
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
-import requests.chats.GetAvailableChats
 import requests.messages.GetPagingData
-import requests.messages.SubMessages
-import responces.ChatListSubResponseCtrl
-import responces.Ctrl
+import requests.messages.SendMessageRequest
+import requests.messages.SubToMessages
 import responces.DefaultCtrl
 import responces.messages.Data
 import responces.messages.MessageMeta
 import responces.messages.MessagePres
-import javax.naming.LimitExceededException
 
 class MessageManager(
     private val session: DefaultClientWebSocketSession,
@@ -28,12 +24,12 @@ class MessageManager(
 
     var shouldBeFinished = atomic(false)
 
-    suspend fun DefaultClientWebSocketSession.subscribeTopic(topicId: String) {
+    suspend fun DefaultClientWebSocketSession.subscribeTopic(topicId: String, messageFlow: MutableStateFlow<MutableList<Message>>) {
 
-        val data = SubMessages.Sub.Get.Data()
-        val get = SubMessages.Sub.Get(data)
-        val sub = SubMessages.Sub(get, topicId)
-        val subMessages = SubMessages(sub)
+        val data = SubToMessages.Sub.Get.Data()
+        val get = SubToMessages.Sub.Get(data)
+        val sub = SubToMessages.Sub(get, topicId)
+        val subMessages = SubToMessages(sub)
 
         send(json.encodeToString(subMessages))
 
@@ -47,8 +43,12 @@ class MessageManager(
                 incoming.receive() as Frame.Text
             }
 
+            var currSeq: Int? = null
+            val messageList = mutableListOf<Message>()
+
             while (!shouldBeFinished.value) {
-                println(shouldBeFinished)
+                //println(shouldBeFinished)
+
 
                 if (!incoming.isEmpty) {
                     val response = (incoming.receive() as Frame.Text).readText()
@@ -60,8 +60,19 @@ class MessageManager(
                         "meta" in jsonObject -> json.decodeFromString<MessageMeta>(response)
                         "pres" in jsonObject -> json.decodeFromString<MessagePres>(response)
                         "data" in jsonObject -> {
-                            val message = json.decodeFromString<Data>(response)
-//
+                            val message = json.decodeFromString<Data>(response).toMessage()
+                            println(message)
+
+                            when {
+                                currSeq == null || message.seq > currSeq -> {
+                                    currSeq = message.seq
+                                    messageList.add(message)
+                                }
+                                message.seq < currSeq -> {
+                                    messageList.add(0, message)
+                                }
+                            }
+                            messageFlow.emit(messageList)
                         }
                         else -> throw RuntimeException("oaoaoaaoaoa")
                     }
@@ -76,40 +87,10 @@ class MessageManager(
         val get = GetPagingData.Get(data = data, topic = topicId)
         val getPagingMessages = GetPagingData(get)
         send(json.encodeToString(getPagingMessages))
+    }
 
-        val resultResponse = incoming.receive() as Frame.Text
-//        println(resultResponse.readText())
-
-        val responseCtrl = json.decodeFromString<DefaultCtrl>(resultResponse.readText())
-
-        if (responseCtrl.ctrl.code == HttpStatusCode.OK.value) {
-            repeat(4) {
-                incoming.receive() as Frame.Text
-            }
-
-            while (true) {
-
-                if (incoming.isEmpty) {
-                } else {
-                    val response = (incoming.receive() as Frame.Text).readText()
-                    val jsonElement = json.parseToJsonElement(response)
-                    val jsonObject = jsonElement.jsonObject
-//                    println(jsonObject)
-
-                    when {
-                        "ctrl" in jsonObject -> json.decodeFromString<DefaultCtrl>(response)
-                        "meta" in jsonObject -> json.decodeFromString<MessageMeta>(response)
-                        "pres" in jsonObject -> json.decodeFromString<MessagePres>(response)
-                        "data" in jsonObject -> {
-                            val message = json.decodeFromString<Data>(response)
-//                            println(message)
-                        }
-                        else -> throw RuntimeException("oaoaoaaoaoa")
-                    }
-                }
-            }
-
-        }
-
+    suspend fun DefaultClientWebSocketSession.sendMessage(topicId: String, content: String) {
+        val pub = SendMessageRequest.Pub(topic = topicId, content = content)
+        send(json.encodeToString(SendMessageRequest(pub)))
     }
 }
