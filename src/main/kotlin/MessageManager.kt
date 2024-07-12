@@ -4,6 +4,7 @@ import io.ktor.http.*
 import io.ktor.websocket.*
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.encodeToString
@@ -24,7 +25,7 @@ class MessageManager(
     private val scope: CoroutineScope,
 ) {
 
-    var shouldBeFinished = atomic(false)
+    var shouldBeFinished = false
 
     suspend fun DefaultClientWebSocketSession.subscribeTopic(
         topicId: String,
@@ -38,19 +39,17 @@ class MessageManager(
         send(json.encodeToString(subMessages))
 
         val resultResponse = incoming.receive() as Frame.Text
-//        println(resultResponse.readText())
 
         val responseCtrl = json.decodeFromString<DefaultCtrl>(resultResponse.readText())
 
         if (responseCtrl.ctrl.code == HttpStatusCode.OK.value) {
-//            repeat(4) {
-//                incoming.receive() as Frame.Text
-//            }
 
-            while (!shouldBeFinished.value) {
+            while (!shouldBeFinished) {
 
                 if (!incoming.isEmpty) {
-                    val response = (incoming.receive() as Frame.Text).readText()
+                    val response = try {
+                         (incoming.receive() as Frame.Text).readText()
+                    } catch (e: ClosedReceiveChannelException) { break }
                     val jsonElement = json.parseToJsonElement(response)
                     val jsonObject = jsonElement.jsonObject
 
@@ -74,19 +73,16 @@ class MessageManager(
         val data = GetPagingData.Get.Data(before, limit, since = 1)
         val get = GetPagingData.Get(data = data, topic = topicId)
         val getPagingMessages = GetPagingData(get)
-        //sendSerialized(getPagingMessages)
         send(json.encodeToString(getPagingMessages))
     }
 
     suspend fun DefaultClientWebSocketSession.sendMessage(topicId: String, content: String) {
         val pub = SendMessageRequest.Pub(topic = topicId, content = content)
-        //sendSerialized(SendMessageRequest(pub))
         send(json.encodeToString(SendMessageRequest(pub)))
     }
 
     suspend fun DefaultClientWebSocketSession.leaveChat(topicId: String) {
         val leave = LeaveChatRequest.Leave(topicId)
-        //sendSerialized(LeaveChatRequest(leave))
         send(json.encodeToString(LeaveChatRequest(leave)))
 
     }

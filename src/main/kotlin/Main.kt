@@ -8,50 +8,41 @@ suspend fun main() {
 
     val client = TinodeClient("127.0.0.1", 6060, "AQAAAAABAAAoeOI7tA3HsYvdzDhYhZJy")
     val scope = CoroutineScope(Dispatchers.Default)
-    val job = scope.launch {
-        val details = "+7-XXX-XXX-XX-XX, 0123456789"
+    val details = "+7-XXX-XXX-XX-XX, 0123456789"
 
-        scope.launch {
+    val job = scope.launch {
+
+        launch {
             client.start()
         }
 
-        scope.launch {
+        launch {
+            client.chatFlow.collect {
+                if (it.isNotEmpty()) {
+                    client.dispatch(TinodeAction.GetMessages(client.chatFlow.value[0].id))
+                }
+            }
+        }
+
+        launch {
             client.messagesFlow.collect {
                 println(it)
             }
         }
 
-        client.dispatch(TinodeAction.Auth("admin", details, "admin", "qwerty123"))
-        println("TinodeAction.Auth")
+        launch {
+            client.dispatch(TinodeAction.Auth("admin", details, "admin", "qwerty123"))
 
-        client.dispatch(TinodeAction.CreateChats)
-        println("TinodeAction.CreateChats")
+            client.dispatch(TinodeAction.CreateChats)
 
-        while (client.chats.size == 0) {
-            println(client.chats.size)
+            //client.dispatch(TinodeAction.GetMessages(client.chatFlow.value[0].id))
+//            client.dispatch(TinodeAction.GetMessages("grpyGOkpuFFLdg"))
+
+            delay(1000)
         }
-        delay(1000)
 
-        println("TinodeAction.GetMessages")
-        client.dispatch(TinodeAction.GetMessages(client.chats[0].id))
-
-        //delay(1000)
-
+        //client.dispatch(TinodeAction.LeaveChat(client.chatFlow.value[0].id))
         //client.dispatch(TinodeAction.CloseConnection)
-
-        //delay(1000)
-
-        println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!${client.chats}")
-
-        delay(1000)
-        client.dispatch(TinodeAction.SendMessage(client.chats[0].id, "New test message!!!"))
-        client.dispatch(TinodeAction.LeaveChat(client.chats[0].id))
-        delay(10_000)
-        client.dispatch(TinodeAction.CloseConnection)
-
-
-
-        delay(1_000)
     }
 
     job.join()

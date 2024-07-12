@@ -57,7 +57,7 @@ class ChatManager
                 }
             }
 
-            println(topicList)
+            //println(topicList)
             return topicList
         } else throw RuntimeException("Chat list not available")
 

@@ -12,6 +12,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -34,11 +35,11 @@ class TinodeClient(
 
     lateinit var token: Pair<String, String>
 
-    // хочу складывать сюда
     private val _messagesFlow = MutableSharedFlow<Message>()
     val messagesFlow: SharedFlow<Message> = _messagesFlow.asSharedFlow()
 
-    val chats = mutableListOf<Topic>()
+    private val _chatsFlow = MutableStateFlow<List<Topic>>(emptyList())
+    val chatFlow: StateFlow<List<Topic>> = _chatsFlow.asStateFlow()
 
     private val subScope = CoroutineScope(Dispatchers.Default)
 
@@ -83,6 +84,7 @@ class TinodeClient(
                         MessageManager(this, jsonFormat, subScope)
                     }
 
+                    println("ffff${inputQueue.firstOrNull()}")
                     when (val action = inputQueue.firstOrNull()) {
                         is TinodeAction.Auth -> {
                             val authManager = AuthManager(this, jsonFormat)
@@ -92,7 +94,8 @@ class TinodeClient(
                             ChatManager(this, jsonFormat).apply {
                                 val a = setupChats()
                                 println(a)
-                                chats.addAll(a)
+                                _chatsFlow.emit(a)
+                                //chats.addAll(a)
                             }
                         }
                         is TinodeAction.GetMessages -> {
