@@ -1,6 +1,7 @@
 import domain.Topic
 import io.ktor.client.plugins.websocket.*
 import io.ktor.http.*
+import io.ktor.util.*
 import io.ktor.websocket.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -11,7 +12,6 @@ import responces.ChatCreateResult
 import responces.ChatListSubResponseCtrl
 import responces.ChatMeta
 import responces.EmptyChatList
-import utils.Base64
 
 class ChatManager
     (
@@ -57,9 +57,10 @@ class ChatManager
                 }
             }
 
-            //println(topicList)
             return topicList
-        } else throw RuntimeException("Chat list not available")
+        } else {
+            println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            throw RuntimeException("Chat list not available")}
 
     }
 
@@ -70,7 +71,7 @@ class ChatManager
         val public = CreateChat.Sub.Set.Desc.Public(config.name, "")
         val desc = CreateChat.Sub.Set.Desc(public)
         val set = CreateChat.Sub.Set(desc)
-        val sub = CreateChat.Sub(set = set, topic = "new${Base64.encodeToBase64(config.name)}")
+        val sub = CreateChat.Sub(set = set, topic = "new${config.name.encodeBase64()}")
         session.send(json.encodeToString(CreateChat(sub = sub)))
 
         val resultResponse = session.incoming.receive() as Frame.Text
@@ -78,14 +79,14 @@ class ChatManager
 
         if (result.ctrl.code == HttpStatusCode.OK.value) {
             config.users.forEach{
-                val sub = AddUser.Set.Sub(it)
-                val set = AddUser.Set(sub, topic = result.ctrl.topic)
-                val addUser = AddUser(set)
+                val addUserSub = AddUser.Set.Sub(it)
+                val addUserSet = AddUser.Set(addUserSub, topic = result.ctrl.topic)
+                val addUser = AddUser(addUserSet)
                 session.send(json.encodeToString(addUser))
             }
 
-            val resultResponse = session.incoming.receive() as Frame.Text
-        } else RuntimeException("Error of creating channel")
+            session.incoming.receive() as Frame.Text
+        } else throw RuntimeException("Error of creating channel")
 
         return result.ctrl.topic
     }

@@ -1,6 +1,5 @@
 package responces
 
-import com.google.gson.annotations.SerializedName
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -10,7 +9,7 @@ data class ChatListSubResponseCtrl(
 ) {
     @Serializable
     data class ChatListSubResponse(
-        @SerializedName("code") override val code: Int,
+        @SerialName("code") override val code: Int,
     ) : Ctrl
 }
 
@@ -21,7 +20,7 @@ data class ChatMeta(
 ) {
     @Serializable
     data class Meta(
-        @SerializedName("sub")
+        @SerialName("sub")
         val sub: List<Sub>
     ) {
         @Serializable

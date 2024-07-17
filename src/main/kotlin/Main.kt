@@ -1,7 +1,9 @@
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+
 
 // пример использования
 suspend fun main() {
@@ -25,7 +27,7 @@ suspend fun main() {
         }
 
         launch {
-            client.messagesFlow.collect {
+            client.messagesFlow.collectLatest {
                 println(it)
             }
         }
@@ -35,10 +37,17 @@ suspend fun main() {
 
             client.dispatch(TinodeAction.CreateChats)
 
-            //client.dispatch(TinodeAction.GetMessages(client.chatFlow.value[0].id))
-//            client.dispatch(TinodeAction.GetMessages("grpyGOkpuFFLdg"))
+            delay(4000)
 
-            delay(1000)
+            client.dispatch(
+                TinodeAction.SendMessage(
+                    topicId = client.chatFlow.value[0].id,
+                    "ggg",
+                    listOf(
+                        "D:\\aniver\\vkusvill\\abc.pdf",
+                    )
+                )
+            )
         }
 
         //client.dispatch(TinodeAction.LeaveChat(client.chatFlow.value[0].id))

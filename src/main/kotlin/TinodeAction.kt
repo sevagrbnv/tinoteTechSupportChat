@@ -21,7 +21,8 @@ sealed class TinodeAction {
 
     data class SendMessage(
         val topicId: String,
-        val content: String
+        val content: String,
+        val fileList: List<String> = emptyList()
     ) : TinodeAction()
 
     data class LeaveChat(

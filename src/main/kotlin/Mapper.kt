@@ -1,9 +1,8 @@
 import domain.Message
 import domain.Topic
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import responces.ChatMeta
 import responces.messages.Data
+import responces.messages.NewData
 
 fun ChatMeta.Meta.Sub.toTopic() = Topic(
     id = topic,
@@ -14,6 +13,14 @@ fun ChatMeta.Meta.Sub.toTopic() = Topic(
 
 fun Data.toMessage() = Message(
     content = data.content,
+    from = data.from,
+    seq = data.seq,
+    topic = data.topic,
+    ts = data.ts
+)
+
+fun NewData.toMessage() = Message(
+    content = "${data.content.txt} ent: ${data.content.ent.size}",
     from = data.from,
     seq = data.seq,
     topic = data.topic,

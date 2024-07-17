@@ -1,4 +1,4 @@
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import responces.Ctrl
 
 @kotlinx.serialization.Serializable
@@ -7,7 +7,7 @@ data class HiResponseCtrl(
 ) {
     @kotlinx.serialization.Serializable
     data class HiResponse(
-        @SerializedName("code") override val code: Int,
+        @SerialName("code") override val code: Int,
     ) : Ctrl
 }
 
@@ -17,13 +17,13 @@ data class LoginResponseCtrl(
 ) {
     @kotlinx.serialization.Serializable
     data class LoginResponse(
-        @SerializedName("code") override val code: Int,
-        @SerializedName("params") val params: Params,
+        @SerialName("code") override val code: Int,
+        @SerialName("params") val params: Params,
     ) : Ctrl {
         @kotlinx.serialization.Serializable
         data class Params(
-            @SerializedName("token") val token: String,
-            @SerializedName("expires") val expires: String,
+            @SerialName("token") val token: String,
+            @SerialName("expires") val expires: String,
         )
     }
 }
@@ -34,6 +34,6 @@ data class AccResponseCtrl(
 ) {
     @kotlinx.serialization.Serializable
     data class AccResponse(
-        @SerializedName("code") override val code: Int,
+        @SerialName("code") override val code: Int,
     ) : Ctrl
 }

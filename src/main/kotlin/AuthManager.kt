@@ -1,12 +1,12 @@
 import io.ktor.client.plugins.websocket.*
 import io.ktor.http.*
+import io.ktor.util.*
 import io.ktor.websocket.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import requests.auth.Acc
 import requests.auth.Hi
 import requests.auth.Login
-import utils.Base64
 
 class AuthManager(
     private val session: DefaultClientWebSocketSession,
@@ -43,11 +43,11 @@ class AuthManager(
 
     private suspend fun DefaultClientWebSocketSession.hi() {
         send(json.encodeToString(Hi()))
-        //sendSerialized(Hi.HiBody("1", "2", "3", "4"))
 
         val response = incoming.receive() as Frame.Text
-//        println(response.readText())
+        println(response.readText())
         val responseCtrl = json.decodeFromString<HiResponseCtrl>(response.readText())
+
         if (responseCtrl.ctrl.code == HttpStatusCode.Created.value) {
             authState = AUTH_STATE.LOGIN
         } else throw RuntimeException("Error in Hi() $responseCtrl")
@@ -57,10 +57,9 @@ class AuthManager(
         login: String,
         password: String,
     ) {
-        send(json.encodeToString(Login(base64 = Base64.encodeToBase64("$login:$password"))))
+        send(json.encodeToString(Login(base64 = "$login:$password".encodeBase64())))
 
         val response = incoming.receive() as Frame.Text
-//        println(response.readText())
         val responseCtrl = json.decodeFromString<LoginResponseCtrl>(response.readText())
         authState = when (responseCtrl.ctrl.code) {
             HttpStatusCode.OK.value -> {
@@ -85,14 +84,12 @@ class AuthManager(
                 Acc.AccBody(
                     desc = desc,
                     cred = listOf(Acc.Cred()),
-                    secret = Base64.encodeToBase64("$login:$password")
+                    secret = "$login:$password".encodeBase64()
                 )
             )
-//        println(acc)
         send(json.encodeToString(acc))
 
         val response = incoming.receive() as Frame.Text
-//        println(response.readText())
         val responseCtrl = json.decodeFromString<LoginResponseCtrl>(response.readText())
         when (responseCtrl.ctrl.code) {
             HttpStatusCode.OK.value -> authState = AUTH_STATE.LOGIN
