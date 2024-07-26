@@ -42,7 +42,9 @@ class AuthManager(
 
 
     private suspend fun DefaultClientWebSocketSession.hi() {
-        send(json.encodeToString(Hi()))
+        val request = json.encodeToString(Hi())
+        println(request)
+        send(request)
 
         val response = incoming.receive() as Frame.Text
         println(response.readText())
@@ -57,9 +59,12 @@ class AuthManager(
         login: String,
         password: String,
     ) {
-        send(json.encodeToString(Login(base64 = "$login:$password".encodeBase64())))
+        val request = json.encodeToString(Login(base64 = "$login:$password".encodeBase64()))
+        println(request)
+        send(request)
 
         val response = incoming.receive() as Frame.Text
+        println(response.readText())
         val responseCtrl = json.decodeFromString<LoginResponseCtrl>(response.readText())
         authState = when (responseCtrl.ctrl.code) {
             HttpStatusCode.OK.value -> {
@@ -68,8 +73,9 @@ class AuthManager(
             }
             HttpStatusCode.BadRequest.value -> AUTH_STATE.LOGIN // 400 неверный пароль
             HttpStatusCode.Unauthorized.value -> AUTH_STATE.REG // 401 нет аккаунта
-            else -> throw RuntimeException("Error in login()")
+            else -> throw RuntimeException("Error in login() $responseCtrl")
         }
+        println(authState)
     }
 
     private suspend fun DefaultClientWebSocketSession.reg(
@@ -87,13 +93,16 @@ class AuthManager(
                     secret = "$login:$password".encodeBase64()
                 )
             )
-        send(json.encodeToString(acc))
+
+        val request = json.encodeToString(acc)
+        println(request)
+        send(request)
 
         val response = incoming.receive() as Frame.Text
-        val responseCtrl = json.decodeFromString<LoginResponseCtrl>(response.readText())
+        val responseCtrl = json.decodeFromString<AccResponseCtrl>(response.readText())
         when (responseCtrl.ctrl.code) {
-            HttpStatusCode.OK.value -> authState = AUTH_STATE.LOGIN
-            else -> throw RuntimeException("Error in reg()")
+            HttpStatusCode.OK.value, HttpStatusCode.Created.value -> authState = AUTH_STATE.LOGIN
+            else -> throw RuntimeException("Error in reg() ${response.readText()}")
         }
     }
 }

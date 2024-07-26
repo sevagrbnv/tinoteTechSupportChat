@@ -9,7 +9,7 @@ data class Acc(
         val user: String = "new",
         val scheme: String = "basic",
         val secret: String,
-        val login: Boolean = true,
+        val login: Boolean = false,
         val desc: Desc,
         val cred: List<Cred> = listOf(Cred())
     )

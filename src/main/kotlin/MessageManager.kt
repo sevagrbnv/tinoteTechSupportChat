@@ -64,11 +64,12 @@ class MessageManager(
                         "pres" in jsonObject -> json.decodeFromString<MessagePres>(response)
                         "data" in jsonObject -> {
                             val message = json.decodeFromString<NewData>(response).toMessage()
-                            println("~~~~~~~~~~~~~~$message")
+                            //println("~~~~~~~~~~~~~~$message")
                             emit(message)
                         }
                         else -> throw RuntimeException("oaoaoaaoaoa")
                     }
+                    println("~~~~~~~~~~~~~~~~~~$jsonElement")
                 }
             }
         }

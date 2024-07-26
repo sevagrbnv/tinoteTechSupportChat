@@ -33,7 +33,7 @@ suspend fun main() {
         }
 
         launch {
-            client.dispatch(TinodeAction.Auth("admin", details, "admin", "qwerty123"))
+            client.dispatch(TinodeAction.Auth("Adolf Hitler", details, "user56", "qwerty123"))
 
             client.dispatch(TinodeAction.CreateChats)
 
@@ -42,7 +42,7 @@ suspend fun main() {
             client.dispatch(
                 TinodeAction.SendMessage(
                     topicId = client.chatFlow.value[0].id,
-                    "ggg",
+                    "Это файл отправленный через наш клиент",
                     listOf(
                         "D:\\aniver\\vkusvill\\abc.pdf",
                     )
